@@ -1,4 +1,3 @@
-// d1n0
 function Menu({ page, setPage, onLogout }) {
   return (
     <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -10,7 +9,7 @@ function Menu({ page, setPage, onLogout }) {
       {' '}
       <button onClick={onLogout}>Déconnexion</button>
       <hr />
-    </div>
+      </div>
   )
 }
 

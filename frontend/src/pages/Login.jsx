@@ -3,33 +3,72 @@ import { useState } from 'react'
 function Login({ onSuccess }) {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    // TODO: appeler POST /auth/login sur FastAPI
-    // Pour l'instant : mock — email contenant "admin" => role admin
-    const role = form.email.includes('admin') ? 'admin' : 'user'
-    onSuccess({ email: form.email, role })
+    setError('')
+    setLoading(true)
+
+    try {
+      const res = await fetch(import.meta.env.VITE_API_URL + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, password: form.password })
+      })
+
+      const data = await res.json()
+      console.log(data)
+
+      if (!res.ok) {
+        setError(data.detail || 'Erreur de connexion')
+        return
+      }
+
+      // on envoie les infos au parent
+      onSuccess({
+        ...data.user,
+        access_token: data.access_token
+      })
+    } catch (err) {
+      console.error(err)
+      setError('Le serveur ne répond pas')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>Connexion</h2>
+    <div className="auth-card">
+      <h2>👋 Connexion</h2>
       <form onSubmit={handleSubmit}>
-        <div>
-          <input name="email" type="email" placeholder="Adresse mail" value={form.email} onChange={handleChange} required />
-        </div>
-        <div>
-          <input name="password" type="password" placeholder="Mot de passe" value={form.password} onChange={handleChange} required />
-        </div>
-        <br />
-        <button type="submit">Se connecter</button>
+        <input
+          name="email"
+          type="email"
+          placeholder="Adresse mail"
+          value={form.email}
+          onChange={handleChange}
+          required
+          autoComplete="email"
+        />
+        <input
+          name="password"
+          type="password"
+          placeholder="Mot de passe"
+          value={form.password}
+          onChange={handleChange}
+          required
+          autoComplete="current-password"
+        />
+        <button type="submit" className="btn-primary" disabled={loading}>
+          {loading ? 'Connexion…' : 'Se connecter'}
+        </button>
       </form>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p className="msg-error" style={{ marginTop: '1rem' }}>{error}</p>}
     </div>
   )
 }

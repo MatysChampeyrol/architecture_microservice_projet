@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 supabase
-pydantic[email]
 pydantic-settings
 python-dotenv
 kafka-python==2.0.2

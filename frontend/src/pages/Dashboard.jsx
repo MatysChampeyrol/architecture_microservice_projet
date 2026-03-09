@@ -1,98 +1,260 @@
-import { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from 'recharts'
 
-const MODELS = [
-  { id: 1, name: 'Model Alpha', accuracy: 94.2, speed: '12ms', status: 'actif' },
-  { id: 2, name: 'Model Beta', accuracy: 87.5, speed: '8ms', status: 'actif' },
-  { id: 3, name: 'Model Gamma', accuracy: 91.0, speed: '15ms', status: 'inactif' },
-]
-
-function genData() {
-  return Array.from({ length: 10 }, (_, i) => ({ t: i, v: Math.floor(Math.random() * 100) }))
-}
+const API = import.meta.env.VITE_API_URL
 
 function Dashboard({ user }) {
-  const [accuracy, setAccuracy] = useState(genData)
-  const [speed, setSpeed] = useState(genData)
-  const [cpu, setCpu] = useState(genData)
-  const [ram, setRam] = useState(genData)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAccuracy(genData())
-      setSpeed(genData())
-      setCpu(genData())
-      setRam(genData())
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [])
+  const [models, setModels] = useState([])
+  const [metricsData, setMetricsData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const isAdmin = user?.role === 'admin'
+  const token = localStorage.getItem('access_token')
+
+  const fetchMetrics = useCallback(async () => {
+    try {
+      // Récupérer le résumé des modèles
+      const [summaryRes, metricsRes] = await Promise.all([
+        fetch(`${API}/training/metrics/summary`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${API}/training/metrics`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ])
+
+      if (!summaryRes.ok || !metricsRes.ok) {
+        throw new Error('Erreur lors du chargement des métriques')
+      }
+
+      const summaryData = await summaryRes.json()
+      const fullData = await metricsRes.json()
+
+      setModels(summaryData)
+      setMetricsData(fullData)
+      setError('')
+    } catch (err) {
+      console.error(err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => {
+    fetchMetrics()
+    const interval = setInterval(fetchMetrics, 5000)
+    return () => clearInterval(interval)
+  }, [fetchMetrics])
+
+  // Préparer les données pour les graphiques accuracy/loss par epoch
+  function buildChartData(metric) {
+    if (metricsData.length === 0) return []
+    const maxEpochs = Math.max(...metricsData.map(m => m.metrics.length), 0)
+    const data = []
+    for (let i = 0; i < maxEpochs; i++) {
+      const point = { epoch: i + 1 }
+      metricsData.forEach(m => {
+        const label = `${m.library} / ${m.dataset}`
+        if (m.metrics[i]) {
+          point[label] = m.metrics[i][metric]
+        }
+      })
+      data.push(point)
+    }
+    return data
+  }
+
+  // Préparer les données CPU/RAM pour les admins
+  function buildSystemChartData(metric) {
+    if (metricsData.length === 0) return []
+    const maxEpochs = Math.max(...metricsData.map(m => m.metrics.length), 0)
+    const data = []
+    for (let i = 0; i < maxEpochs; i++) {
+      const point = { epoch: i + 1 }
+      metricsData.forEach(m => {
+        const label = `${m.library} / ${m.dataset}`
+        if (m.metrics[i]) {
+          point[label] = m.metrics[i][metric]
+        }
+      })
+      data.push(point)
+    }
+    return data
+  }
+
+  const COLORS = ['#6366f1', '#06b6d4', '#f59e0b', '#ec4899', '#22c55e', '#a855f7']
+
+  function getModelLines() {
+    return metricsData.map((m, i) => `${m.library} / ${m.dataset}`)
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <div className="spinner" />
+        <p className="loading-text">Chargement des métriques…</p>
+      </div>
+    )
+  }
+
+  const accuracyData = buildChartData('accuracy')
+  const lossData = buildChartData('loss')
+  const cpuData = buildSystemChartData('cpu')
+  const ramData = buildSystemChartData('ram')
+  const lineKeys = getModelLines()
+  const hasData = metricsData.length > 0 && metricsData.some(m => m.metrics.length > 0)
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>Dashboard</h2>
+    <div>
+      <div className="dashboard-header">
+        <h2>Dashboard</h2>
+        <p>Bienvenue, {user?.first_name || 'utilisateur'} — suivi en temps réel des entraînements</p>
+      </div>
 
-      <h3>Modèles</h3>
-      <table border="1" cellPadding="8" style={{ margin: '0 auto' }}>
-        <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Précision</th>
-            <th>Vitesse</th>
-            <th>Statut</th>
-          </tr>
-        </thead>
-        <tbody>
-          {MODELS.map(m => (
-            <tr key={m.id}>
-              <td>{m.name}</td>
-              <td>{m.accuracy}%</td>
-              <td>{m.speed}</td>
-              <td>{m.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {error && <p className="msg-error" style={{ marginBottom: '1rem' }}>{error}</p>}
 
-      <h3>Précision du modèle</h3>
-      <LineChart width={400} height={200} data={accuracy}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="t" />
-        <YAxis domain={[0, 100]} />
-        <Tooltip />
-        <Line type="monotone" dataKey="v" dot={false} isAnimationActive={false} />
-      </LineChart>
+      {/* Tableau des modèles */}
+      <div className="card" style={{ marginBottom: 'var(--space-xl)' }}>
+        <h3>Modèles entraînés</h3>
+        {models.length === 0 ? (
+          <div className="empty-state">
+            <p>Aucun modèle en cours</p>
+            <span>Les métriques apparaîtront ici quand un entraînement sera lancé via Docker</span>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Modèle</th>
+                <th>Epochs</th>
+                <th>Accuracy</th>
+                <th>Loss</th>
+                {isAdmin && <th>CPU %</th>}
+                {isAdmin && <th>RAM %</th>}
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((m, i) => (
+                <tr key={i}>
+                  <td style={{ fontWeight: 500 }}>{m.name}</td>
+                  <td>{m.epochs_completed}</td>
+                  <td>{(m.accuracy * 100).toFixed(1)}%</td>
+                  <td>{m.loss.toFixed(4)}</td>
+                  {isAdmin && <td>{m.cpu}%</td>}
+                  {isAdmin && <td>{m.ram}%</td>}
+                  <td>
+                    <span className={`badge ${m.status === 'terminé' ? 'badge-success' : 'badge-warning'}`}>
+                      {m.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-      <h3>Vitesse d'exécution (ms)</h3>
-      <LineChart width={400} height={200} data={speed}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="t" />
-        <YAxis domain={[0, 100]} />
-        <Tooltip />
-        <Line type="monotone" dataKey="v" dot={false} isAnimationActive={false} />
-      </LineChart>
-
-      {isAdmin && (
+      {/* Graphiques */}
+      {hasData && (
         <>
-          <h3>CPU — utilisation vs machine hôte (%)</h3>
-          <LineChart width={400} height={200} data={cpu}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="t" />
-            <YAxis domain={[0, 100]} />
-            <Tooltip />
-            <Line type="monotone" dataKey="v" dot={false} isAnimationActive={false} />
-          </LineChart>
+          <div className="dashboard-grid">
+            <div className="chart-card">
+              <h3>Accuracy par Epoch</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={accuracyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                  <XAxis dataKey="epoch" stroke="#64748b" fontSize={12} />
+                  <YAxis domain={[0, 1]} stroke="#64748b" fontSize={12} tickFormatter={v => `${(v * 100).toFixed(0)}%`} />
+                  <Tooltip
+                    contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8 }}
+                    labelStyle={{ color: '#94a3b8' }}
+                    formatter={(v) => `${(v * 100).toFixed(2)}%`}
+                  />
+                  <Legend />
+                  {lineKeys.map((key, i) => (
+                    <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} dot={false} strokeWidth={2} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-          <h3>RAM — utilisation vs machine hôte (%)</h3>
-          <LineChart width={400} height={200} data={ram}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="t" />
-            <YAxis domain={[0, 100]} />
-            <Tooltip />
-            <Line type="monotone" dataKey="v" dot={false} isAnimationActive={false} />
-          </LineChart>
+            <div className="chart-card">
+              <h3>Loss par Epoch</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={lossData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                  <XAxis dataKey="epoch" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8 }}
+                    labelStyle={{ color: '#94a3b8' }}
+                    formatter={(v) => v.toFixed(4)}
+                  />
+                  <Legend />
+                  {lineKeys.map((key, i) => (
+                    <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} dot={false} strokeWidth={2} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {isAdmin && (
+            <div className="dashboard-grid" style={{ marginTop: 'var(--space-lg)' }}>
+              <div className="chart-card">
+                <h3>CPU — Utilisation (%)</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={cpuData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                    <XAxis dataKey="epoch" stroke="#64748b" fontSize={12} />
+                    <YAxis domain={[0, 100]} stroke="#64748b" fontSize={12} tickFormatter={v => `${v}%`} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8 }}
+                      labelStyle={{ color: '#94a3b8' }}
+                      formatter={(v) => `${v}%`}
+                    />
+                    <Legend />
+                    {lineKeys.map((key, i) => (
+                      <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} dot={false} strokeWidth={2} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="chart-card">
+                <h3>RAM — Utilisation (%)</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={ramData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3348" />
+                    <XAxis dataKey="epoch" stroke="#64748b" fontSize={12} />
+                    <YAxis domain={[0, 100]} stroke="#64748b" fontSize={12} tickFormatter={v => `${v}%`} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e2235', border: '1px solid #2d3348', borderRadius: 8 }}
+                      labelStyle={{ color: '#94a3b8' }}
+                      formatter={(v) => `${v}%`}
+                    />
+                    <Legend />
+                    {lineKeys.map((key, i) => (
+                      <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} dot={false} strokeWidth={2} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </>
+      )}
+
+      {!hasData && models.length === 0 && (
+        <div className="card empty-state">
+          <p>📊 Aucune donnée de training disponible</p>
+          <span>Lancez un entraînement via <code>docker-compose up</code> pour voir les métriques ici</span>
+        </div>
       )}
     </div>
   )

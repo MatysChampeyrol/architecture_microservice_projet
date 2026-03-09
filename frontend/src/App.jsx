@@ -14,36 +14,46 @@ function App() {
   })
 
   function handleLogin(userData) {
-    localStorage.setItem('user', JSON.stringify(userData))
-    setUser(userData)
+    // Stocker le token séparément pour les futures requêtes authentifiées
+    const { access_token, ...userInfo } = userData
+    localStorage.setItem('access_token', access_token)
+    localStorage.setItem('user', JSON.stringify(userInfo))
+    setUser(userInfo)
     setPage('dashboard')
   }
 
   function handleLogout() {
     localStorage.removeItem('user')
+    localStorage.removeItem('access_token')
     setUser(null)
     setPage('login')
   }
 
   if (!user) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        {page === 'register' ? <Register onSuccess={() => setPage('login')} /> : <Login onSuccess={handleLogin} />}
-        <br />
+      <div className="auth-container">
         {page === 'register'
-          ? <span>Déjà un compte ? <button onClick={() => setPage('login')}>Se connecter</button></span>
-          : <span>Pas de compte ? <button onClick={() => setPage('register')}>S'inscrire</button></span>
+          ? <Register onSuccess={() => setPage('login')} />
+          : <Login onSuccess={handleLogin} />
         }
+        <div className="auth-card switch-link" style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: '1rem' }}>
+          {page === 'register'
+            ? <span>Déjà un compte ? <button onClick={() => setPage('login')}>Se connecter</button></span>
+            : <span>Pas de compte ? <button onClick={() => setPage('register')}>S'inscrire</button></span>
+          }
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '20px' }}>
+    <div className="app-layout">
       <Menu page={page} setPage={setPage} onLogout={handleLogout} />
-      {page === 'dashboard' && <Dashboard user={user} />}
-      {page === 'contacts' && <Contacts />}
-      {page === 'cgu' && <CGU />}
+      <main className="app-content">
+        {page === 'dashboard' && <Dashboard user={user} />}
+        {page === 'contacts' && <Contacts />}
+        {page === 'cgu' && <CGU />}
+      </main>
     </div>
   )
 }
