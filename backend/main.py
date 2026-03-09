@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from auth_service.auth_service import router as auth_router
+from computation_service.computation_service import router as metrics_router, start_consumer
 
 app = FastAPI(title="Auth Service")
 
@@ -13,6 +14,11 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(metrics_router)
+
+@app.on_event("startup")
+def startup():
+    start_consumer()
 
 @app.get("/")
 async def root():
