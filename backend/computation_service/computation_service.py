@@ -3,7 +3,9 @@ import json
 import os
 from fastapi import APIRouter, Depends
 from kafka import KafkaConsumer
+from supabase import create_client
 from auth_service.auth_service import get_current_user, require_admin
+from config.config import get_settings
 
 router = APIRouter(prefix="/metrics", tags=["Metrics"])
 
@@ -12,6 +14,9 @@ KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "kafka:9092")
 metrics = []
 
 def kafka_consumer_thread():
+    settings = get_settings()
+    supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+
     consumer = KafkaConsumer(
         "training_metrics",
         bootstrap_servers=KAFKA_BROKER,
@@ -20,7 +25,9 @@ def kafka_consumer_thread():
         group_id="computation-service"
     )
     for message in consumer:
-        metrics.append(message.value)
+        data = message.value
+        metrics.append(data)
+        supabase.table("training_metrics").insert(data).execute()
 
 def start_consumer():
     t = threading.Thread(target=kafka_consumer_thread, daemon=True)
