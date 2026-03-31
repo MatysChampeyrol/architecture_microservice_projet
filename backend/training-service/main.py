@@ -5,17 +5,20 @@ import psutil
 import numpy as np
 from kafka import KafkaProducer
 
+# on récupère la config depuis les variables d'environnement
 LIBRARY = os.environ.get("LIBRARY", "pytorch")
 DATASET = os.environ.get("DATASET", "fashion-mnist")
 KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "kafka:9092")
 EPOCHS = 5
 
+# producteur Kafka pour envoyer les métriques au format JSON
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BROKER,
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 
 
+# fonction utilitaire pour envoyer une métrique sur le topic Kafka
 def send_metric(library, dataset, epoch, accuracy, loss, cpu, ram, execution_time):
     producer.send("training_metrics", {
         "library": library,
@@ -37,6 +40,7 @@ if LIBRARY == "pytorch":
     from torchvision import datasets, transforms
     from torch.utils.data import DataLoader
 
+    # choix du dataset (CIFAR-100 ou Fashion-MNIST)
     if DATASET == "cifar100":
         transform = transforms.Compose([transforms.ToTensor()])
         train_data = datasets.CIFAR100(root="./data", train=True, download=True, transform=transform)
@@ -52,6 +56,7 @@ if LIBRARY == "pytorch":
 
     loader = DataLoader(train_data, batch_size=64, shuffle=True)
 
+    # architecture CNN simple : 2 couches conv + 2 couches fully connected
     model = nn.Sequential(
         nn.Conv2d(in_channels, 32, 3, padding=1), nn.ReLU(),
         nn.MaxPool2d(2),
@@ -102,6 +107,7 @@ else:
         input_shape = (28, 28, 1)
         num_classes = 10
 
+    # même architecture CNN mais en Keras
     model = tf.keras.Sequential([
         tf.keras.layers.Conv2D(32, 3, activation="relu", padding="same", input_shape=input_shape),
         tf.keras.layers.MaxPooling2D(),
@@ -114,6 +120,7 @@ else:
 
     model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
+    # boucle d'entraînement Keras, on fait 1 epoch à la fois pour envoyer les métriques
     for epoch in range(1, EPOCHS + 1):
         start_time = time.time()
         history = model.fit(x_train, y_train, epochs=1, batch_size=64, verbose=0)

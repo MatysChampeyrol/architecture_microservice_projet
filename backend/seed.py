@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from supabase import create_client
 from config.config import get_settings
 
+# liste des utilisateurs de test (2 admins + 3 users)
 USERS = [
     {"first_name": "Admin", "last_name": "Un", "email": "admin1@projet.com", "password": "Admin1234!", "role": "admin"},
     {"first_name": "Admin", "last_name": "Deux", "email": "admin2@projet.com", "password": "Admin1234!", "role": "admin"},
@@ -19,6 +20,7 @@ def main():
     settings = get_settings()
     supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
+    # on parcourt chaque utilisateur et on le crée via Supabase Auth
     for user in USERS:
         try:
             res = supabase.auth.sign_up({
