@@ -16,6 +16,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(metrics_router)
 
+# au démarrage de l'app on lance le consumer Kafka en arrière-plan
 @app.on_event("startup")
 def startup():
     start_consumer()

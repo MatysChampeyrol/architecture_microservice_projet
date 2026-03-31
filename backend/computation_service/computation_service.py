@@ -16,6 +16,7 @@ EPOCHS = 5
 metrics = []
 
 
+# thread qui écoute Kafka et sauvegarde les métriques dans Supabase
 def kafka_consumer_thread():
     settings = get_settings()
     supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
@@ -37,6 +38,7 @@ def start_consumer():
     t.start()
 
 
+# regroupe les métriques par modèle (library + dataset)
 def group_metrics_by_model(raw):
     grouped = defaultdict(list)
     for m in raw:
@@ -59,11 +61,13 @@ def group_metrics_by_model(raw):
     return result
 
 
+# endpoint pour récupérer toutes les métriques (user connecté)
 @router.get("/metrics", dependencies=[Depends(get_current_user)])
 def get_metrics():
     return group_metrics_by_model(metrics)
 
 
+# endpoint résumé avec le statut de chaque entraînement
 @router.get("/metrics/summary", dependencies=[Depends(get_current_user)])
 def get_metrics_summary():
     grouped = defaultdict(list)
@@ -85,6 +89,7 @@ def get_metrics_summary():
     return result
 
 
+# endpoint réservé aux admins pour voir CPU/RAM
 @router.get("/metrics/system", dependencies=[Depends(require_admin)])
 def get_system_metrics():
     grouped = defaultdict(list)

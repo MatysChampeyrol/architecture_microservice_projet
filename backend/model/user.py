@@ -6,6 +6,7 @@ class RoleEnum(str, Enum):
     user = "user"
     admin = "admin"
 
+# schéma pour l'inscription d'un nouvel utilisateur
 class UserRegister(BaseModel):
     first_name: str
     last_name: str

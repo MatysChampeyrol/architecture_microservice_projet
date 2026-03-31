@@ -8,11 +8,13 @@ from model.user import UserRegister, UserLogin, TokenResponse, RegisterResponse
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
 
+# on crée un client Supabase à chaque requête
 def get_supabase():
     settings = get_settings()
     supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
     return supabase
 
+# vérifie le token JWT et retourne l'utilisateur connecté
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     supabase = get_supabase()
     res = supabase.auth.get_user(credentials.credentials)
@@ -20,12 +22,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Token invalide")
     return res.user
 
+# vérifie que l'utilisateur est admin
 def require_admin(user = Depends(get_current_user)):
     if user.user_metadata.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin requis")
     return user
 
 
+# route pour créer un nouveau compte
 @router.post("/register", response_model=RegisterResponse)
 async def register(user: UserRegister):
     supabase = get_supabase()
@@ -51,6 +55,7 @@ async def register(user: UserRegister):
     )
 
 
+# route pour se connecter et récupérer un token JWT
 @router.post("/login", response_model=TokenResponse)
 async def login(user: UserLogin):
     supabase = get_supabase()
@@ -63,6 +68,7 @@ async def login(user: UserLogin):
     if res.session is None:
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
 
+    # on retourne le token + les infos de l'utilisateur
     return TokenResponse(
         access_token=res.session.access_token,
         token_type="bearer",
