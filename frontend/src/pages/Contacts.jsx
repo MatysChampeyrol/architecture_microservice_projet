@@ -2,9 +2,9 @@ function Contacts() {
   return (
     <div style={{ textAlign: 'center' }}>
       <h2>Contacts</h2>
-      <p>Email : contact@projet.com</p>
-      <p>Tel : +33 1 00 00 00 00</p>
-      <p>Adresse : 1 rue de la République, 75001 Paris</p>
+      <p>Email : lucas.fritsch@etu.u-cergy.fr</p>
+      <p>Tel : +33 6 51 12 27 16</p>
+      <p>Adresse : 16 rue Henri Faisans 64000 Pau</p>
     </div>
   )
 }
