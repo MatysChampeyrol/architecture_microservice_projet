@@ -14,7 +14,6 @@ function App() {
   })
 
   function handleLogin(userData) {
-    // Stocker le token séparément pour les futures requêtes authentifiées
     const { access_token, ...userInfo } = userData
     localStorage.setItem('access_token', access_token)
     localStorage.setItem('user', JSON.stringify(userInfo))

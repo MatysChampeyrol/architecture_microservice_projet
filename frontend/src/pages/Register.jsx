@@ -48,7 +48,7 @@ function Register({ onSuccess }) {
 
   return (
     <div className="auth-card">
-      <h2>🚀 Inscription</h2>
+      <h2>Inscription</h2>
       <form onSubmit={handleSubmit}>
         <input
           name="nom"

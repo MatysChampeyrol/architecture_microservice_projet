@@ -29,7 +29,6 @@ function Login({ onSuccess }) {
         return
       }
 
-      // on envoie les infos au parent
       onSuccess({
         ...data.user,
         access_token: data.access_token
@@ -44,7 +43,7 @@ function Login({ onSuccess }) {
 
   return (
     <div className="auth-card">
-      <h2>👋 Connexion</h2>
+      <h2>Connexion</h2>
       <form onSubmit={handleSubmit}>
         <input
           name="email"

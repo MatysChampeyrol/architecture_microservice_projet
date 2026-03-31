@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import psutil
 import numpy as np
 from kafka import KafkaProducer
@@ -14,7 +15,8 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 
-def send_metric(library, dataset, epoch, accuracy, loss, cpu, ram):
+
+def send_metric(library, dataset, epoch, accuracy, loss, cpu, ram, execution_time):
     producer.send("training_metrics", {
         "library": library,
         "dataset": dataset,
@@ -22,9 +24,11 @@ def send_metric(library, dataset, epoch, accuracy, loss, cpu, ram):
         "accuracy": round(float(accuracy), 4),
         "loss": round(float(loss), 4),
         "cpu": round(float(cpu), 2),
-        "ram": round(float(ram), 2)
+        "ram": round(float(ram), 2),
+        "execution_time": round(float(execution_time), 2)
     })
     producer.flush()
+
 
 if LIBRARY == "pytorch":
     import torch
@@ -62,6 +66,7 @@ if LIBRARY == "pytorch":
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(1, EPOCHS + 1):
+        start_time = time.time()
         total_loss = 0.0
         correct = 0
         total = 0
@@ -77,9 +82,10 @@ if LIBRARY == "pytorch":
 
         epoch_loss = total_loss / total
         epoch_acc = correct / total
+        epoch_time = time.time() - start_time
         cpu = psutil.cpu_percent(interval=0.1)
         ram = psutil.virtual_memory().percent
-        send_metric("pytorch", DATASET, epoch, epoch_acc, epoch_loss, cpu, ram)
+        send_metric("pytorch", DATASET, epoch, epoch_acc, epoch_loss, cpu, ram, epoch_time)
 
 else:
     import tensorflow as tf
@@ -106,13 +112,14 @@ else:
         tf.keras.layers.Dense(num_classes, activation="softmax")
     ])
 
-    loss_fn = "sparse_categorical_crossentropy"
-    model.compile(optimizer="adam", loss=loss_fn, metrics=["accuracy"])
+    model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
     for epoch in range(1, EPOCHS + 1):
+        start_time = time.time()
         history = model.fit(x_train, y_train, epochs=1, batch_size=64, verbose=0)
+        epoch_time = time.time() - start_time
         epoch_loss = history.history["loss"][0]
         epoch_acc = history.history["accuracy"][0]
         cpu = psutil.cpu_percent(interval=0.1)
         ram = psutil.virtual_memory().percent
-        send_metric("keras", DATASET, epoch, epoch_acc, epoch_loss, cpu, ram)
+        send_metric("keras", DATASET, epoch, epoch_acc, epoch_loss, cpu, ram, epoch_time)
